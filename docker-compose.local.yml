@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+
+  amqp_service:
+    image: rabbitmq:latest
+    container_name: amqp_service
+    restart: unless-stopped
+    networks:
+      - nameko-test
+
+  orders-service:
+    image: jalvarez/orders-service:local
+    container_name: orders-service
+    restart: unless-stopped
+    command: nodemon -e .py --exec "nameko run --config config.local.yaml main"
+    build:
+      context: ./orders
+      dockerfile: Dockerfile.local
+    volumes:
+      - ./orders:/home/app
+    networks:
+      - nameko-test
+    depends_on:
+      - amqp_service
+
+  api-rest-service:
+    image: jalvarez/api-rest-service:local
+    container_name: api-rest-service
+    restart: unless-stopped
+    command: nodemon -e .py --exec "nameko run --config config.local.yaml main"
+    ports:
+      - 4200:8000
+    build:
+      context: ./api-rest
+      dockerfile: Dockerfile.local
+    volumes:
+      - ./api-rest:/home/app
+    networks:
+      - nameko-test
+    depends_on:
+      - amqp_service
+
+  postgres-nameko-db:
+    image: postgres:14.5-bullseye
+    container_name: postgres-nameko-db
+    ports:
+      - 5439:5432
+    environment:
+      - POSTGRES_PASSWORD=admin
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=nameko
+    networks:
+      - nameko-test
+
+networks:
+  nameko-test:
+    driver: bridge
